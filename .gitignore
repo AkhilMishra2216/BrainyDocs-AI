@@ -1,0 +1,9 @@
+backend/venv/
+backend/.env
+backend/uploads/
+backend/faiss_index/
+.hf_cache/
+frontend/node_modules/
+.DS_Store
+__pycache__/
+*.pyc

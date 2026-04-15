@@ -1,0 +1,134 @@
+@import "tailwindcss";
+
+/* ================================================================
+   BrainyDocs AI – Design System
+   Premium dark-mode palette inspired by the provided mockups.
+   ================================================================ */
+
+@theme {
+  --color-bg-primary: #0a0e1a;
+  --color-bg-secondary: #111827;
+  --color-bg-card: #151c2e;
+  --color-bg-card-hover: #1a2340;
+  --color-bg-sidebar: #0d1220;
+  --color-bg-input: #1a2236;
+  --color-bg-modal: #141b2d;
+  --color-border: #1e293b;
+  --color-border-light: #2a3650;
+  --color-accent: #8b5cf6;
+  --color-accent-light: #a78bfa;
+  --color-accent-glow: #7c3aed;
+  --color-accent-muted: #6d28d9;
+  --color-text-primary: #e2e8f0;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #64748b;
+  --color-success: #34d399;
+  --color-danger: #f87171;
+  --color-warning: #fbbf24;
+}
+
+/* ── Base ────────────────────────────────────────────────────────── */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg-secondary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-light);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-accent);
+}
+
+/* ── Glassmorphism utility ───────────────────────────────────────── */
+.glass {
+  background: rgba(21, 28, 46, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(139, 92, 246, 0.15);
+}
+
+.glass-strong {
+  background: rgba(20, 27, 45, 0.85);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+}
+
+/* ── Glow Effects ────────────────────────────────────────────────── */
+.glow-accent {
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.15),
+              0 0 60px rgba(139, 92, 246, 0.05);
+}
+
+.glow-accent-strong {
+  box-shadow: 0 0 30px rgba(139, 92, 246, 0.3),
+              0 0 80px rgba(139, 92, 246, 0.1);
+}
+
+/* ── Button base ─────────────────────────────────────────────────── */
+.btn-primary {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 10px 24px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 25px rgba(139, 92, 246, 0.35);
+}
+
+/* ── Animations ──────────────────────────────────────────────────── */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(139, 92, 246, 0.08) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}
