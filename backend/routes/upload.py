@@ -8,9 +8,12 @@ chunks it, and indexes into the FAISS vector store.
 import os
 import uuid
 import shutil
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from sqlalchemy.orm import Session
 from rag.chunking import extract_text, chunk_text
-from rag.vector_store import add_documents
+from rag.vector_store import add_documents, delete_from_vector_store
+from database import get_db
+import models
 
 router = APIRouter(tags=["upload"])
 
@@ -18,14 +21,20 @@ router = APIRouter(tags=["upload"])
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# In-memory document registry (replaces MongoDB for now)
-document_registry: list[dict] = []
-
+# In-memory document registry is removed - Using MySQL
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt"}
 
+from routes.auth import get_current_user
+from rag.llm import llm
+from langchain_core.messages import HumanMessage, SystemMessage
+from rag.retrieval import retrieve_context, format_context_for_prompt
 
 @router.post("/upload")
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(
+    file: UploadFile = File(...), 
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user)
+):
     """
     Upload a document, extract & chunk its text, and add to the
     FAISS vector store for semantic retrieval.
@@ -62,34 +71,73 @@ async def upload_document(file: UploadFile = File(...)):
     metadata = {"filename": file.filename, "file_id": file_id}
     add_documents(chunks, metadata=metadata)
 
-    # Register in memory
-    doc_info = {
-        "file_id": file_id,
-        "filename": file.filename,
-        "chunks": len(chunks),
-        "characters": len(raw_text),
-        "status": "ready",
-    }
-    document_registry.append(doc_info)
+    # Register in database
+    db_doc = models.Document(
+        file_id=file_id,
+        filename=file.filename,
+        chunks=len(chunks),
+        characters=len(raw_text)
+    )
+    db.add(db_doc)
+    db.commit()
+    db.refresh(db_doc)
 
     return {
         "message": "Document uploaded and indexed successfully.",
-        "document": doc_info,
+        "document": {
+            "file_id": db_doc.file_id,
+            "filename": db_doc.filename,
+            "chunks": db_doc.chunks,
+            "characters": db_doc.characters,
+            "status": "ready"
+        },
     }
 
 
 @router.get("/documents")
-async def list_documents():
+async def list_documents(db: Session = Depends(get_db)):
     """Return all indexed documents."""
-    return {"documents": document_registry}
+    docs = db.query(models.Document).all()
+    # Format to match existing payload expectation
+    return {"documents": [{"file_id": d.file_id, "filename": d.filename, "chunks": d.chunks, "characters": d.characters} for d in docs]}
 
 
 @router.delete("/documents/{file_id}")
-async def delete_document(file_id: str):
-    """Remove a document from the registry (FAISS rebuild not implemented yet)."""
-    global document_registry
-    before = len(document_registry)
-    document_registry = [d for d in document_registry if d["file_id"] != file_id]
-    if len(document_registry) == before:
+async def delete_document(file_id: str, db: Session = Depends(get_db)):
+    """Remove a document from SQLite and FAISS."""
+    doc = db.query(models.Document).filter(models.Document.file_id == file_id).first()
+    if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
-    return {"message": "Document removed from registry."}
+    
+    # Delete from FAISS
+    delete_from_vector_store(file_id)
+    
+    # Delete from database
+    db.delete(doc)
+    db.commit()
+    return {"message": "Document removed from registry and vector store."}
+
+@router.get("/summary")
+async def generate_summary(
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user)
+):
+    """Generate a high-level summary of all indexed documents using the LLM."""
+    docs = db.query(models.Document).all()
+    if not docs:
+        raise HTTPException(status_code=400, detail="No documents available to summarize.")
+    
+    file_names = ", ".join([d.filename for d in docs])
+    
+    chunks = retrieve_context("What are the main topics, entities, and summaries of these documents?", k=15)
+    context = format_context_for_prompt(chunks) if chunks else "No content available."
+    
+    prompt = f"Provide a comprehensive, high-level executive summary of the following document content. The documents included are: {file_names}.\n\nContext:\n{context}"
+    
+    messages = [
+        SystemMessage(content="You are an expert analyst. Summarize the provided document context concisely and professionally in markdown format."),
+        HumanMessage(content=prompt)
+    ]
+    
+    response = llm.invoke(messages)
+    return {"summary": response.content}

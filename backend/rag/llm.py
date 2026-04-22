@@ -13,7 +13,7 @@ from typing import Annotated, TypedDict
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from langchain.tools import tool
-from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage, AIMessageChunk, ToolMessage
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
@@ -119,52 +119,31 @@ agent_graph = build_agent_graph()
 # Public API
 # ---------------------------------------------------------------------------
 
-# In-memory chat history (keyed by session_id)
-_chat_histories: dict[str, list] = {}
+# In-memory chat history removed
 
+import json
 
-def chat(
+def chat_stream(
     query: str,
-    session_id: str = "default",
+    history_messages: list,
     mode: str = "normal",
-) -> dict:
-    """
-    Run a user query through the agentic RAG pipeline.
-
-    Returns a dict with:
-      - answer: str
-      - sources: list[dict]
-    """
-    # Build / retrieve message history
-    if session_id not in _chat_histories:
-        _chat_histories[session_id] = []
-
-    history = _chat_histories[session_id]
-
+):
     system_msg = SystemMessage(content=build_system_prompt(mode))
     user_msg = HumanMessage(content=query)
+    
+    messages = [system_msg] + history_messages + [user_msg]
 
-    messages = [system_msg] + history + [user_msg]
-
-    # Invoke the agent
-    result = agent_graph.invoke({"messages": messages})
-
-    # Extract the final AI message
-    ai_messages = [
-        m for m in result["messages"]
-        if isinstance(m, AIMessage) and not m.tool_calls
-    ]
-    answer = ai_messages[-1].content if ai_messages else "I could not generate a response."
-
-    # Persist history (keep last 20 messages to bound memory)
-    history.append(user_msg)
-    history.append(AIMessage(content=answer))
-    _chat_histories[session_id] = history[-20:]
-
-    # Extract source citations from retrieved docs
+    # Pre-fetch sources since tools might take a while, send them immediately
     sources = retrieve_context(query, k=3)
+    formatted_sources = [{"id": i, "content": "", "metadata": s["metadata"]} for i, s in enumerate(sources)]
+    yield f"data: {json.dumps({'type': 'sources', 'data': formatted_sources})}\n\n"
 
-    return {
-        "answer": answer,
-        "sources": sources,
-    }
+    # Stream agent execution
+    full_answer = ""
+    for chunk, metadata in agent_graph.stream({"messages": messages}, stream_mode="messages"):
+        if isinstance(chunk, AIMessageChunk) and chunk.content:
+            full_answer += chunk.content
+            yield f"data: {json.dumps({'type': 'chunk', 'data': chunk.content})}\n\n"
+    
+    # Return the final full text at the end for DB saving purposes
+    yield f"data: {json.dumps({'type': 'done', 'final_answer': full_answer})}\n\n"

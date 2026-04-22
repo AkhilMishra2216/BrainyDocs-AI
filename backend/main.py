@@ -10,6 +10,12 @@ from dotenv import load_dotenv
 
 from routes.upload import router as upload_router
 from routes.chat import router as chat_router
+from routes.auth import router as auth_router
+
+import models
+from database import engine
+
+models.Base.metadata.create_all(bind=engine)
 
 load_dotenv()
 
@@ -35,6 +41,7 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 app.include_router(upload_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
+app.include_router(auth_router, prefix="/api/auth")
 
 
 @app.get("/")

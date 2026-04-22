@@ -6,6 +6,7 @@ import {
   Upload,
   User,
   LogIn,
+  Trash2,
 } from 'lucide-react'
 
 const navItems = [
@@ -19,8 +20,9 @@ export default function Sidebar({
   activeNav,
   onNavChange,
   onUploadClick,
-  isLoggedIn,
+  user,
   onLoginClick,
+  onDeleteDocument,
 }) {
   return (
     <aside className="w-[240px] min-w-[240px] h-full bg-bg-sidebar border-r border-border flex flex-col">
@@ -69,10 +71,19 @@ export default function Sidebar({
             {documents.map((doc) => (
               <div
                 key={doc.file_id}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-text-secondary rounded-lg hover:bg-bg-card transition-colors"
+                className="group flex items-center justify-between px-3 py-2 text-sm text-text-secondary rounded-lg hover:bg-bg-card transition-colors"
               >
-                <FileText size={14} className="text-accent shrink-0" />
-                <span className="truncate">{doc.filename}</span>
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <FileText size={14} className="text-accent shrink-0" />
+                  <span className="truncate">{doc.filename}</span>
+                </div>
+                <button 
+                  onClick={() => onDeleteDocument(doc.file_id)}
+                  className="text-text-muted hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer border-none bg-transparent p-0 flex shrink-0"
+                  title="Delete Document"
+                >
+                  <Trash2 size={14} />
+                </button>
               </div>
             ))}
           </div>
@@ -95,7 +106,7 @@ export default function Sidebar({
 
       {/* Bottom section */}
       <div className="p-3 space-y-2">
-        {!isLoggedIn && (
+        {!user && (
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
@@ -106,14 +117,14 @@ export default function Sidebar({
             Sign In
           </motion.button>
         )}
-        {isLoggedIn && (
+        {user && (
           <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-bg-card">
-            <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
               <User size={16} className="text-accent-light" />
             </div>
-            <div>
-              <p className="text-sm font-medium text-text-primary">User</p>
-              <p className="text-[10px] text-text-muted">Free Tier</p>
+            <div className="overflow-hidden">
+              <p className="text-sm font-medium text-text-primary truncate">{user.email}</p>
+              <p className="text-[10px] text-text-muted">Authenticated</p>
             </div>
           </div>
         )}

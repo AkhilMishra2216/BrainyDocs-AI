@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
-import { FileText, Download, Zap, Brain, Sparkles } from 'lucide-react'
+import { FileText, Download, Zap, Brain, Sparkles, Loader2 } from 'lucide-react'
+import { useState } from 'react'
 import ToggleSwitch from './ToggleSwitch'
 
 export default function RightPanel({
@@ -9,6 +10,33 @@ export default function RightPanel({
   onDeepToggle,
   sources,
 }) {
+  const [isDownloading, setIsDownloading] = useState(false)
+
+  const handleDownloadSummary = async () => {
+    try {
+      setIsDownloading(true)
+      const res = await fetch('/api/summary') // Note: upload_router is prefixed with /api in main.py, so it's /api/summary
+      if (!res.ok) throw new Error('Failed to generate summary')
+      
+      const data = await res.json()
+      
+      const blob = new Blob([data.summary], { type: 'text/markdown' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `BrainyDocs_Summary_${new Date().toISOString().split('T')[0]}.md`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error(err)
+      alert('Could not download summary. Are you logged in and are there documents uploaded?')
+    } finally {
+      setIsDownloading(false)
+    }
+  }
+
   return (
     <aside className="w-[280px] min-w-[280px] h-full bg-bg-sidebar border-l border-border flex flex-col overflow-y-auto">
       {/* Intelligence Modes */}
@@ -146,10 +174,16 @@ export default function RightPanel({
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          className="w-full mt-4 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-bg-card border border-border text-sm text-text-secondary hover:text-accent-light hover:border-accent/30 transition-all cursor-pointer"
+          onClick={handleDownloadSummary}
+          disabled={isDownloading}
+          className={`w-full mt-4 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-bg-card border border-border text-sm transition-all cursor-pointer ${isDownloading ? 'text-accent opacity-70 cursor-not-allowed' : 'text-text-secondary hover:text-accent-light hover:border-accent/30'}`}
         >
-          <Download size={14} />
-          Download Summary Report
+          {isDownloading ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <Download size={14} />
+          )}
+          {isDownloading ? 'Generating...' : 'Download Summary Report'}
         </motion.button>
       </div>
     </aside>

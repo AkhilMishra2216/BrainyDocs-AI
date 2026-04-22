@@ -58,3 +58,19 @@ def similarity_search(query: str, k: int = 5) -> list[Document]:
     if store is None:
         return []
     return store.similarity_search(query, k=k)
+
+def delete_from_vector_store(file_id: str):
+    """Remove all vectors from FAISS matching a specific file_id."""
+    store = get_vector_store()
+    if store is None:
+        return
+
+    # Find IDs to remove
+    ids_to_remove = []
+    for doc_id, doc in store.docstore._dict.items():
+        if doc.metadata.get("file_id") == file_id:
+            ids_to_remove.append(doc_id)
+            
+    if ids_to_remove:
+        store.delete(ids_to_remove)
+        store.save_local(INDEX_DIR)
