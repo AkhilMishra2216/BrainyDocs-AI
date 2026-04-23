@@ -165,6 +165,15 @@ function App() {
     setShowLoginView(false)
   }
 
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+    } catch (err) {
+      console.error("Failed to logout:", err)
+    }
+    setUser(null)
+  }
+
   if (showLoginView) {
     return <LoginView onLoginSuccess={handleLoginSuccess} />
   }
@@ -182,6 +191,7 @@ function App() {
         }}
         user={user}
         onLoginClick={() => setShowLoginView(true)}
+        onLogoutClick={handleLogout}
         onDeleteDocument={handleDeleteDocument}
       />
 

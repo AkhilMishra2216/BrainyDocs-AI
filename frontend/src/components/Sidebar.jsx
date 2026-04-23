@@ -6,6 +6,7 @@ import {
   Upload,
   User,
   LogIn,
+  LogOut,
   Trash2,
 } from 'lucide-react'
 
@@ -22,6 +23,7 @@ export default function Sidebar({
   onUploadClick,
   user,
   onLoginClick,
+  onLogoutClick,
   onDeleteDocument,
 }) {
   return (
@@ -118,14 +120,23 @@ export default function Sidebar({
           </motion.button>
         )}
         {user && (
-          <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-bg-card">
-            <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
-              <User size={16} className="text-accent-light" />
+          <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-bg-card">
+            <div className="flex items-center gap-3 overflow-hidden">
+              <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
+                <User size={16} className="text-accent-light" />
+              </div>
+              <div className="overflow-hidden">
+                <p className="text-sm font-medium text-text-primary truncate">{user.email}</p>
+                <p className="text-[10px] text-text-muted">Authenticated</p>
+              </div>
             </div>
-            <div className="overflow-hidden">
-              <p className="text-sm font-medium text-text-primary truncate">{user.email}</p>
-              <p className="text-[10px] text-text-muted">Authenticated</p>
-            </div>
+            <button
+              onClick={onLogoutClick}
+              className="text-text-muted hover:text-red-400 transition-colors bg-transparent border-none cursor-pointer p-1 shrink-0"
+              title="Log Out"
+            >
+              <LogOut size={16} />
+            </button>
           </div>
         )}
         <motion.button
