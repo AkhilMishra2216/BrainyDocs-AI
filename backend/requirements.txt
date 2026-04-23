@@ -13,7 +13,6 @@ python-docx==1.1.2
 tavily-python==0.5.0
 pydantic==2.9.2
 SQLAlchemy>=2.0.0
-pymysql>=1.1.0
-passlib[bcrypt]>=1.7.4
+psycopg2-binary>=2.9.0
 bcrypt>=4.0.0
 cryptography>=41.0.0

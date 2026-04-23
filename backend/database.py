@@ -7,7 +7,7 @@ load_dotenv()
 
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./brainydocs.db")
 
-# For MySQL, we don't need check_same_thread
+# For SQLite, we need check_same_thread; for PostgreSQL/MySQL we don't
 if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
     engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 else:

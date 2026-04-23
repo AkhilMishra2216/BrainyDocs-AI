@@ -2,16 +2,17 @@ version: '3.8'
 
 services:
   db:
-    image: mysql:8.0
+    image: postgres:15-alpine
     container_name: brainydocs_db
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: brainydocs
+      POSTGRES_USER: brainydocs
+      POSTGRES_PASSWORD: rootpassword
+      POSTGRES_DB: brainydocs
     ports:
-      - "3306:3306"
+      - "5432:5432"
     volumes:
-      - db_data:/var/lib/mysql
+      - db_data:/var/lib/postgresql/data
 
   backend:
     build: ./backend
@@ -20,7 +21,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=mysql+pymysql://root:rootpassword@db:3306/brainydocs
+      - DATABASE_URL=postgresql://brainydocs:rootpassword@db:5432/brainydocs
       - GROQ_API_KEY=${GROQ_API_KEY}
       - TAVILY_API_KEY=${TAVILY_API_KEY}
     depends_on:
