@@ -13,7 +13,7 @@ _embeddings_instance = None
 
 class DebugHFEmbeddings:
     def __init__(self, api_key, model_name):
-        self.api_url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{model_name}"
+        self.api_url = f"https://router.huggingface.co/hf-inference/models/{model_name}/pipeline/feature-extraction"
         self.headers = {"Authorization": f"Bearer {api_key}"}
 
     def _call_api(self, texts):
