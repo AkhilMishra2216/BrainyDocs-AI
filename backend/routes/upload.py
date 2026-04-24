@@ -64,23 +64,29 @@ async def upload_document(
     if not raw_text.strip():
         raise HTTPException(status_code=400, detail="No extractable text found in the document.")
 
-    # Chunk
-    chunks = chunk_text(raw_text)
+    try:
+        # Chunk
+        chunks = chunk_text(raw_text)
 
-    # Index into FAISS
-    metadata = {"filename": file.filename, "file_id": file_id}
-    add_documents(chunks, metadata=metadata)
+        # Index into FAISS
+        metadata = {"filename": file.filename, "file_id": file_id}
+        add_documents(chunks, metadata=metadata)
 
-    # Register in database
-    db_doc = models.Document(
-        file_id=file_id,
-        filename=file.filename,
-        chunks=len(chunks),
-        characters=len(raw_text)
-    )
-    db.add(db_doc)
-    db.commit()
-    db.refresh(db_doc)
+        # Register in database
+        db_doc = models.Document(
+            file_id=file_id,
+            filename=file.filename,
+            chunks=len(chunks),
+            characters=len(raw_text)
+        )
+        db.add(db_doc)
+        db.commit()
+        db.refresh(db_doc)
+    except Exception as e:
+        import traceback
+        trace = traceback.format_exc()
+        print(f"[Upload Error]: {trace}")
+        raise HTTPException(status_code=500, detail=f"Internal error during embedding/indexing: {str(e)}\n\n{trace}")
 
     return {
         "message": "Document uploaded and indexed successfully.",
