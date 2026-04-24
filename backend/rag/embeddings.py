@@ -1,75 +1,80 @@
 """
 embeddings.py
 -------------
-Uses the HuggingFace Inference API for embeddings — zero local memory needed.
-Falls back to local model if HF_API_TOKEN is not set (for local development).
-Includes retry logic for API cold starts and robust error handling.
+Uses the HuggingFace Inference API for embeddings via raw requests to debug the response.
 """
 
 import os
 import time
-from langchain_community.embeddings import HuggingFaceInferenceAPIEmbeddings
+import requests
 
-# ---------------------------------------------------------------------------
-# "all-MiniLM-L6-v2" gives a good balance of speed and quality (384-dim).
-# ---------------------------------------------------------------------------
 _MODEL_NAME = "all-MiniLM-L6-v2"
-
 _embeddings_instance = None
 
+class DebugHFEmbeddings:
+    def __init__(self, api_key, model_name):
+        self.api_url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{model_name}"
+        self.headers = {"Authorization": f"Bearer {api_key}"}
 
-class RetryHFInferenceEmbeddings:
-    """Wrapper around HuggingFaceInferenceAPIEmbeddings with automatic retry."""
-
-    def __init__(self, api_key, model_name, max_retries=5, retry_delay=5):
-        self._inner = HuggingFaceInferenceAPIEmbeddings(
-            api_key=api_key,
-            model_name=model_name,
+    def _call_api(self, texts):
+        print(f"[Embeddings] Hitting {self.api_url} with {len(texts)} texts...")
+        response = requests.post(
+            self.api_url,
+            headers=self.headers,
+            json={"inputs": texts, "options": {"wait_for_model": True}},
+            timeout=120
         )
-        self._max_retries = max_retries
-        self._retry_delay = retry_delay
-
-    def _retry(self, func, *args, **kwargs):
-        last_error = None
-        for attempt in range(self._max_retries):
-            try:
-                result = func(*args, **kwargs)
-                if result:
-                    return result
-            except Exception as e:
-                last_error = e
-                print(f"[Embeddings] Attempt {attempt + 1}/{self._max_retries} failed: {type(e).__name__} - {str(e)}")
+        print(f"[Embeddings] HTTP {response.status_code}")
+        print(f"[Embeddings] Raw Response: {response.text[:500]}")
+        
+        if response.status_code != 200:
+            raise RuntimeError(f"HF API Error {response.status_code}: {response.text[:200]}")
             
-            if attempt < self._max_retries - 1:
-                print(f"[Embeddings] Retrying in {self._retry_delay}s (waiting for HF API)...")
-                time.sleep(self._retry_delay)
-                
-        raise RuntimeError(f"Embedding API failed after {self._max_retries} retries. Last error: {str(last_error)}")
+        try:
+            return response.json()
+        except Exception as e:
+            raise RuntimeError(f"Failed to parse JSON. Response was: {response.text[:200]}")
 
     def embed_documents(self, texts):
-        # Process in batches of 32 to avoid timeouts
         all_embeddings = []
         batch_size = 32
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]
-            result = self._retry(self._inner.embed_documents, batch)
-            all_embeddings.extend(result)
+            
+            # Simple retry loop
+            for attempt in range(5):
+                try:
+                    result = self._call_api(batch)
+                    all_embeddings.extend(result)
+                    break
+                except Exception as e:
+                    print(f"[Embeddings] Attempt {attempt+1}/5 failed: {str(e)}")
+                    if attempt == 4:
+                        raise
+                    time.sleep(5)
+                    
         return all_embeddings
 
     def embed_query(self, text):
-        return self._retry(self._inner.embed_query, text)
+        for attempt in range(5):
+            try:
+                result = self._call_api([text])
+                return result[0]
+            except Exception as e:
+                print(f"[Embeddings] Query Attempt {attempt+1}/5 failed: {str(e)}")
+                if attempt == 4:
+                    raise
+                time.sleep(5)
 
     def warm_up(self):
         try:
-            print("[Embeddings] Warming up HuggingFace model...")
-            self.embed_query("warm up")
-            print("[Embeddings] Model is ready!")
+            print("[Embeddings] Warming up...")
+            self._call_api(["warm up"])
+            print("[Embeddings] Warm-up success!")
         except Exception as e:
-            print(f"[Embeddings] Warm-up failed (will retry on first real call): {e}")
-
+            print(f"[Embeddings] Warm-up failed: {str(e)}")
 
 def get_embeddings():
-    """Return a singleton embeddings instance. Uses API in production, local in dev."""
     global _embeddings_instance
     if _embeddings_instance is not None:
         return _embeddings_instance
@@ -77,18 +82,12 @@ def get_embeddings():
     hf_token = os.getenv("HF_API_TOKEN")
 
     if hf_token:
-        # Production: Use HuggingFace Inference API (cloud) with retries
-        _embeddings_instance = RetryHFInferenceEmbeddings(
+        _embeddings_instance = DebugHFEmbeddings(
             api_key=hf_token,
-            model_name=f"sentence-transformers/{_MODEL_NAME}",
-            max_retries=5,
-            retry_delay=5,
+            model_name=f"sentence-transformers/{_MODEL_NAME}"
         )
-        # Warm up on first load
         _embeddings_instance.warm_up()
-        print("[Embeddings] Using HuggingFace Inference API (cloud) with retry")
     else:
-        # Local development: Load model into memory
         from langchain_community.embeddings import HuggingFaceEmbeddings
         os.environ["HF_HOME"] = os.path.join(os.path.dirname(__file__), "..", "..", ".hf_cache")
         _embeddings_instance = HuggingFaceEmbeddings(
@@ -96,6 +95,4 @@ def get_embeddings():
             model_kwargs={"device": "cpu"},
             encode_kwargs={"normalize_embeddings": True},
         )
-        print("[Embeddings] Using local HuggingFace model")
-
     return _embeddings_instance
